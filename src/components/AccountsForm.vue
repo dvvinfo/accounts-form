@@ -1,149 +1,167 @@
-<!-- AccountsForm.vue -->
+<script setup lang="ts">
+import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { useCredentials } from '@/composables/useCredentials'
+
+const {
+  credentials,
+  addCredential,
+  removeCredential,
+  handleTagsBlur,
+  handleTypeChange,
+  validateCredential,
+  spanMethod,
+} = useCredentials()
+</script>
+
 <template>
-  <div class="accounts-form">
-    <h2>Учетные записи</h2>
-    <el-button @click="addNewAccount" type="primary">+</el-button>
-
-    <p class="hint">Для указания нескольких меток для одной пары логин/пароль используйте разделитель ;</p>
-
-    <div v-for="(account, index) in accounts" :key="index" class="account-entry">
-      <el-form :model="account" :rules="rules" ref="form" @validate="validateAccount(index)">
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-form-item label="Метка" prop="label">
-              <el-input
-                v-model="account.label"
-                :maxlength="50"
-                placeholder="Введите метку"
-                @blur="updateAccount(index, { label: account.label })"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Тип записи" prop="type">
-              <el-select
-                v-model="account.type"
-                placeholder="Выберите тип"
-                @change="handleTypeChange(index)"
-              >
-                <el-option label="Локальная" value="Локальная" />
-                <el-option label="LDAP" value="LDAP" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Логин" prop="login">
-              <el-input
-                v-model="account.login"
-                :maxlength="100"
-                placeholder="Введите логин"
-                @blur="updateAccount(index, { login: account.login })"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6" v-if="account.type === 'Локальная'">
-            <el-form-item label="Пароль" prop="password">
-              <el-input
-                v-model="account.password"
-                type="password"
-                :maxlength="100"
-                placeholder="Введите пароль"
-                @blur="updateAccount(index, { password: account.password })"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="1">
-            <el-button
-              type="danger"
-              icon="el-icon-delete"
-              @click="removeAccount(index)"
-            />
-          </el-col>
-        </el-row>
-      </el-form>
+  <div class="credentials-container">
+    <div class="header">
+      <h2>Учетные записи</h2>
+      <el-button type="primary" plain @click="addCredential">
+        <el-icon><Plus /></el-icon>
+      </el-button>
     </div>
+
+    <div class="info-tip">
+      <el-icon><InfoFilled /></el-icon>
+      <span
+        >Для указания нескольких меток для одной пары логин/пароль используйте разделитель ;</span
+      >
+    </div>
+
+    <el-table
+      :data="credentials"
+      class="credentials-table"
+      :border="false"
+      :cell-style="{ padding: '5px' }"
+      :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+      :span-method="spanMethod"
+    >
+      <el-table-column label="Метки" min-width="220">
+        <template #default="{ row, $index }">
+          <el-input
+            v-model="row.tagsInput"
+            placeholder="XXX"
+            maxlength="50"
+            :class="{ 'is-error': row.errors.tags }"
+            @blur="handleTagsBlur($index)"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column label="Тип записи" min-width="180">
+        <template #default="{ row, $index }">
+          <el-select
+            v-model="row.type"
+            class="w-full"
+            :class="{ 'is-error': row.errors.type }"
+            @change="handleTypeChange($index)"
+          >
+            <el-option label="Локальная" value="local" />
+            <el-option label="LDAP" value="ldap" />
+          </el-select>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="Логин" min-width="180">
+        <template #default="{ row, $index }">
+          <el-input
+            v-model="row.login"
+            placeholder="Значение"
+            maxlength="100"
+            :class="{ 'is-error': row.errors.login }"
+            @blur="validateCredential($index)"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column label="Пароль" min-width="180">
+        <template #default="{ row, $index }">
+          <el-input
+            v-if="row.type === 'local'"
+            v-model="row.password"
+            placeholder="Значение"
+            maxlength="100"
+            type="password"
+            show-password
+            :class="{ 'is-error': row.errors.password }"
+            @blur="validateCredential($index)"
+          />
+          <template v-else>
+            <!-- Пустое место для LDAP типа -->
+          </template>
+        </template>
+      </el-table-column>
+
+      <el-table-column width="70" align="center">
+        <template #default="{ $index }">
+          <el-button type="danger" plain circle @click="removeCredential($index)">
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref, watch } from 'vue'
-import { useAccountsStore } from '../stores/credentials'
-import { ElForm } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-
-const accountsStore = useAccountsStore()
-const accounts = accountsStore.accounts
-const form = ref<FormInstance>()
-
-const rules: FormRules = {
-  login: [{ required: true, message: 'Логин обязателен', trigger: 'blur' }],
-  password: [
-    { required: true, message: 'Пароль обязателен', trigger: 'blur' }
-  ], // Only for "Локальная"
-  type: [{ required: true, message: 'Тип записи обязателен', trigger: 'change' }]
-}
-
-function addNewAccount() {
-  accountsStore.addAccount()
-}
-
-function removeAccount(index: number) {
-  accountsStore.removeAccount(index)
-}
-
-function updateAccount(index: number, data: Partial<Account>) {
-  accountsStore.updateAccount(index, data)
-}
-
-function handleTypeChange(index: number) {
-  const account = accounts.value[index]
-  if (account.type === 'LDAP') {
-    updateAccount(index, { password: null })
-  }
-  // Trigger validation
-  validateAccount(index)
-}
-
-function validateAccount(index: number) {
-  if (!form.value) return
-  form.value.validate((valid) => {
-    if (valid) {
-      // Account is valid, save/update in store
-      updateAccount(index, accounts.value[index])
-    } else {
-      // Mark fields with red border (handled by Element Plus validation)
-    }
-  })
-}
-
-// Persist data (e.g., using localStorage or Vuex/Pinia persistence plugin)
-watch(accounts, (newAccounts) => {
-  localStorage.setItem('accounts', JSON.stringify(newAccounts))
-}, { deep: true })
-
-// Load persisted data on mount
-onMounted(() => {
-  const savedAccounts = localStorage.getItem('accounts')
-  if (savedAccounts) {
-    accountsStore.accounts = JSON.parse(savedAccounts)
-  }
-})
-</script>
-
 <style scoped>
-.accounts-form {
-  padding: 20px;
+.credentials-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px 0;
 }
 
-.account-entry {
-  margin-bottom: 20px;
-  border: 1px solid #eee;
-  padding: 10px;
+.header {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-.hint {
-  color: #666;
-  font-size: 12px;
-  margin-bottom: 10px;
+.info-tip {
+  background-color: #f0f7ff;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.credentials-table {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.credentials-table :deep(tr) {
+  background-color: transparent;
+}
+
+.credentials-table :deep(td) {
+  border-bottom: 1px solid #ebeef5;
+  border-top: none;
+  border-right: none;
+}
+
+.credentials-table :deep(th) {
+  border-bottom: 1px solid #dcdfe6;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-weight: 600;
+}
+
+.w-full {
+  width: 100%;
+}
+
+:deep(.el-input.is-error .el-input__wrapper),
+:deep(.el-select.is-error .el-input__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+:deep(.el-table__row .cell) {
+  padding: 0;
 }
 </style>
